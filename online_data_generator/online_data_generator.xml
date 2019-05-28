@@ -1,0 +1,10 @@
+<library path="lib/libonline_data_generator">
+
+  <class name="online_data_generator/DeepFlow"
+         type="online_data_generator::DeepFlow"
+         base_class_type="nodelet::Nodelet">
+    <description>
+    </description>
+  </class>
+
+</library>

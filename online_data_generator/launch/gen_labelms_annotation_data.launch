@@ -1,0 +1,28 @@
+<launch>
+
+  <arg name="input_mask" default="/handheld_object_tracking/output/mask" />
+  <arg name="input_rgb" default="/camera/rgb/image_rect_color" />
+
+  <node name="annotaion_trriger"
+        pkg="online_data_generator" type="annotation_trigger.py"
+        output="screen">
+    <rosparam subst_valur="true">
+      approximate_sync: true
+    </rosparam>
+
+    <remap from="~input_mask_img" to="$(arg input_mask)" />
+    <remap from="~input_rgb_img" to="$(arg input_rgb)" />
+  </node>
+
+  <node name="gen_labelme_annotation_data"
+        pkg="online_data_generator" type="gen_labelme_annotation_data.py"
+        output="screen">
+    <rosparam subst_value="true">
+      approximate_sync: false
+    </rosparam>
+    <remap from="~input_mask_img" to="/annotaion_trriger/mask_image" />
+    <remap from="~input_rgb_img" to="/annotaion_trriger/rgb_image" />
+    <remap from="~input_annotation_info" to="/annotaion_trriger/annotation_info" />
+  </node>
+
+</launch>

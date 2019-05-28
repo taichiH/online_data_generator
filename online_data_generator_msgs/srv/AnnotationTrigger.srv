@@ -1,0 +1,4 @@
+online_data_generator_msgs/AnnotationInfo info
+---
+string message
+bool status

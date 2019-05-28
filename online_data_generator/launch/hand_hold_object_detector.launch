@@ -1,0 +1,18 @@
+<launch>
+  <arg name="input_depth" default="/camera/depth_registered/hw_registered/image_rect" />
+  <arg name="input_rgb" default="/camera/rgb/image_rect_color" />
+  <arg name="input_rect" default="/ssd_object_detector/output/rect" />
+
+  <node name="hand_hold_object_detector"
+        pkg="online_data_generator" type="hand_hold_object_detector.py"
+        output="screen">
+    <rosparam subst_value="true">
+      approximate_sync: true
+    </rosparam>
+  </node>
+
+  <remap from="~input_depth_img" to="$(arg input_depth)" />
+  <remap from="~input_rgb_img" to="$(arg input_rgb)" />
+  <remap from="~input_hand_rect" to="$(arg input_rect)" />
+
+</launch>

@@ -1,0 +1,12 @@
+sensor_msgs/Image input_image
+float32 channel
+float32 max_iter
+float32 min_labels
+float32 lr
+float32 conv
+float32 superpixels
+float32 compactness
+float32 visualize
+---
+sensor_msgs/Image output_image
+bool status
