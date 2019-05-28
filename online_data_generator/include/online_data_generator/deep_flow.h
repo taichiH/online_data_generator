@@ -21,6 +21,7 @@ namespace online_data_generator
 
     ros::NodeHandle nh_;
     ros::NodeHandle pnh_;
+    ros::Subscriber img_sub_;
     ros::Publisher output_img_pub_;
 
     cv::Ptr<cv::DenseOpticalFlow> opt_ = cv::optflow::createOptFlow_DeepFlow();

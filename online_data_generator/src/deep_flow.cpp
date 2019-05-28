@@ -8,7 +8,7 @@ namespace online_data_generator
     pnh_ = getPrivateNodeHandle();
 
     output_img_pub_ = pnh_.advertise<sensor_msgs::Image>("output", 1);
-    ros::Subscriber img_sub_ = pnh_.subscribe("input", 1, &DeepFlow::callback, this);
+    img_sub_ = pnh_.subscribe("input", 1, &DeepFlow::callback, this);
   }
 
   void DeepFlow::callback(const sensor_msgs::ImageConstPtr &img_msg){
@@ -26,24 +26,28 @@ namespace online_data_generator
       current_img_.copyTo(prev_img_);
 
     cv::Mat flow_img;
+    // output flow_img has 2 channels
     opt_->calc(current_img_, prev_img_, flow_img);
-    std::vector<cv::Mat> flow_vec;
+
+    cv::Mat flow_vec[2];
     cv::split(flow_img, flow_vec);
-    cv::Mat magnitude, angle;
+
+    cv::Mat magnitude, normalized_magnitude, angle;
     cv::cartToPolar(flow_vec[0], flow_vec[1], magnitude, angle, true);
+    cv::normalize(magnitude, normalized_magnitude, 0.0, 1.0, cv::NORM_MINMAX);
+
     cv::Mat hsv_planes[3];
     hsv_planes[0] = angle;
-    cv::normalize(magnitude, magnitude, 0.0, 1.0, cv::NORM_MINMAX);
-    hsv_planes[1] = magnitude;
+    hsv_planes[1] = normalized_magnitude;
     hsv_planes[2] = cv::Mat::ones(magnitude.size(), CV_32F);
-    cv::Mat hsv;
+
+    cv::Mat hsv, buf, output_img;
     cv::merge(hsv_planes, 3, hsv);
-    cv::Mat buf, output_img;
     cv::cvtColor(hsv, buf, cv::COLOR_HSV2BGR);
     buf *= 255.0;
     buf.convertTo(output_img, CV_8UC3);
+    current_img_.copyTo(prev_img_);
 
-    prev_img_ = current_img_;
     output_img_pub_.publish(cv_bridge::CvImage(img_msg->header,
                                                sensor_msgs::image_encodings::BGR8,
                                                output_img).toImageMsg());

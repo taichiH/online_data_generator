@@ -1,10 +1,10 @@
 <launch>
-  <arg name="input" default="/remote/openni_camera/rgb/image_rect_color" />
+  <arg name="input" default="/camera/color/image_rect_color" />
 
   <node name="deep_flow"
         pkg="nodelet" type="nodelet"
         args="standalone online_data_generator/DeepFlow"
         output="screen">
-    <remap from="input" to="$(arg input)" />
+    <remap from="~input" to="$(arg input)" />
   </node>
 </launch>
