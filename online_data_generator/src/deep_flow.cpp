@@ -7,6 +7,8 @@ namespace online_data_generator
     nh_ = getNodeHandle();
     pnh_ = getPrivateNodeHandle();
 
+    pnh_.getParam("debug", debug_);
+    pnh_.getParam("threshold", threshold_);
     output_img_pub_ = pnh_.advertise<sensor_msgs::Image>("output", 1);
     img_sub_ = pnh_.subscribe("input", 1, &DeepFlow::callback, this);
   }
@@ -43,10 +45,26 @@ namespace online_data_generator
 
     cv::Mat hsv, buf, output_img;
     cv::merge(hsv_planes, 3, hsv);
+
     cv::cvtColor(hsv, buf, cv::COLOR_HSV2BGR);
     buf *= 255.0;
     buf.convertTo(output_img, CV_8UC3);
     current_img_.copyTo(prev_img_);
+
+    cv::Mat mask_img = cv::Mat::zeros(hsv.size(), CV_8UC1);
+    for (int i=0; i<hsv.cols; i++) {
+      for (int j=0; j<hsv.rows; j++) {
+        if(hsv.at<cv::Vec3f>(j, i)[1] > threshold_) {
+         mask_img.at<unsigned char>(j, i) = 255;
+        }
+      }
+    }
+
+    if (debug_){
+      cv::imshow("hsv_image", hsv);
+      cv::imshow("debug_mask_img", mask_img);
+      cv::waitKey(50);
+    }
 
     output_img_pub_.publish(cv_bridge::CvImage(img_msg->header,
                                                sensor_msgs::image_encodings::BGR8,

@@ -29,6 +29,9 @@ namespace online_data_generator
     cv::Mat input_img_;
     cv::Mat current_img_;
     cv::Mat prev_img_;
+
+    bool debug_ = false;
+    float threshold_ = 0.5;
   private:
   };
 } // end online_data_generator
