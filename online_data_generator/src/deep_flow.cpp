@@ -10,7 +10,30 @@ namespace online_data_generator
     pnh_.getParam("debug", debug_);
     pnh_.getParam("threshold", threshold_);
     output_img_pub_ = pnh_.advertise<sensor_msgs::Image>("output", 1);
-    img_sub_ = pnh_.subscribe("input", 1, &DeepFlow::callback, this);
+
+    service_server_ =
+      pnh_.advertiseService("get_deep_flow_mask", &DeepFlow::service_callback,this);
+    img_sub_ =
+      pnh_.subscribe("input", 1, &DeepFlow::callback, this);
+  }
+
+  bool DeepFlow::service_callback(online_data_generator_msgs::Segmentation::Request &_req,
+                                  online_data_generator_msgs::Segmentation::Response &_res){
+    boost::mutex::scoped_lock lock(mutex_);
+
+    try{
+      sensor_msgs::ImagePtr image_ptr = cv_bridge::CvImage(header_,
+                                                           sensor_msgs::image_encodings::MONO8,
+                                                           mask_img_).toImageMsg();
+      _res.output_image = *image_ptr;
+    } catch (cv_bridge::Exception& e){
+      NODELET_ERROR("cv_bridge exception: %s", e.what());
+      _res.status = false;
+      return false;
+    }
+
+    _res.status = true;
+    return true;
   }
 
   void DeepFlow::callback(const sensor_msgs::ImageConstPtr &img_msg){
@@ -51,18 +74,22 @@ namespace online_data_generator
     buf.convertTo(output_img, CV_8UC3);
     current_img_.copyTo(prev_img_);
 
-    cv::Mat mask_img = cv::Mat::zeros(hsv.size(), CV_8UC1);
-    for (int i=0; i<hsv.cols; i++) {
-      for (int j=0; j<hsv.rows; j++) {
-        if(hsv.at<cv::Vec3f>(j, i)[1] > threshold_) {
-         mask_img.at<unsigned char>(j, i) = 255;
+    {
+      boost::mutex::scoped_lock lock(mutex_);
+      mask_img_ = cv::Mat::zeros(hsv.size(), CV_8UC1);
+      header_ = img_msg->header;
+      for (int i=0; i<hsv.cols; i++) {
+        for (int j=0; j<hsv.rows; j++) {
+          if(hsv.at<cv::Vec3f>(j, i)[1] > threshold_) {
+            mask_img_.at<unsigned char>(j, i) = 255;
+          }
         }
       }
     }
 
     if (debug_){
       cv::imshow("hsv_image", hsv);
-      cv::imshow("debug_mask_img", mask_img);
+      cv::imshow("debug_mask_img", mask_img_);
       cv::waitKey(50);
     }
 

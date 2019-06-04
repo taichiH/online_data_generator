@@ -28,7 +28,7 @@ include_directories(
 link_directories(${OPENCV_LIBRARY_DIRS})
 
 catkin_package(
-  CATKIN_DEPENDS
+  CATKIN_DEPENDS online_data_generator_msgs
   LIBRARIES ${PROJECT_NAME}
   INCLUDE_DIRS include
   )
