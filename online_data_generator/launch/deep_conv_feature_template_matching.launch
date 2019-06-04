@@ -1,6 +1,7 @@
 <launch>
   <arg name="use_cuda" default="true" />
   <arg name="threshold" default="0.5" />
+  <arg name="template_dir" default="$(find )" />
   <arg name="input_image" default="/remote/openni_camera/rgb/image_rect_color" />
 
   <node name="deep_conv_feature_template_matching"

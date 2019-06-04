@@ -60,10 +60,9 @@ class FeatureExtractor():
                 res *= x
             return res
 
-    def calc_l_star(self, template, k=3):
+    def calc_extraction_layer(self, template, k=3):
         l = np.sum(self.rf <= min(list(template.size()[-2:]))) - 1
-        l_star = max(l - k, 1)
-        return l_star
+        return max(l - k, 1)
 
     def calc_NCC(self, F, M):
         c, h_f, w_f = F.shape[-3:]
@@ -75,47 +74,36 @@ class FeatureExtractor():
         NCC = np.sum(tmp*F.reshape(F.shape[-3], 1, 1, F.shape[-2], F.shape[-1]), axis=(0, 3, 4))
         return NCC
 
-    def __call__(self, template, image, use_cython=False):
-        if self.use_cuda:
-            template = template.cuda()
-            image = image.cuda()
+    def nms(self, dets, scores, thresh):
+        x1 = dets[:, 0, 0]
+        y1 = dets[:, 0, 1]
+        x2 = dets[:, 1, 0]
+        y2 = dets[:, 1, 1]
+        areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+        order = scores.argsort()[::-1]
 
-        self.l_star = self.calc_l_star(template)
+        keep = []
+        while order.size > 0:
+            i = order[0]
+            keep.append(i)
+            xx1 = np.maximum(x1[i], x1[order[1:]])
+            yy1 = np.maximum(y1[i], y1[order[1:]])
+            xx2 = np.minimum(x2[i], x2[order[1:]])
+            yy2 = np.minimum(y2[i], y2[order[1:]])
 
-        print("save features...")
+            w = np.maximum(0.0, xx2 - xx1 + 1)
+            h = np.maximum(0.0, yy2 - yy1 + 1)
+            inter = w * h
+            ovr = inter / (areas[i] + areas[order[1:]] - inter)
 
-        # save template feature map (named F in paper)
-        template_handle = self.model[self.index[self.l_star]].register_forward_hook(
-            self.save_template_feature_map)
-        self.model(template)
-        template_handle.remove()
+            inds = np.where(ovr <= thresh)[0]
+            order = order[inds + 1]
+        return keep
 
-        # save image feature map (named M in papar)
-        image_handle = self.model[self.index[self.l_star]].register_forward_hook(
-            self.save_image_feature_map)
-        self.model(image)
-        image_handle.remove()
 
-        if self.use_cuda:
-            self.template_feature_map = self.template_feature_map.cpu()
-            self.image_feature_map = self.image_feature_map.cpu()
-
-        print("calc NCC...")
-        # calc NCC
-        F = self.template_feature_map.numpy()[0].astype(np.float32)
-        M = self.image_feature_map.numpy()[0].astype(np.float32)
-
-        if use_cython:
-            import cython_files.cython_calc_NCC as cython_calc_NCC
-            self.NCC = np.zeros(
-                (M.shape[1] - F.shape[1]) * (M.shape[2] - F.shape[2])).astype(np.float32)
-            cython_calc_NCC.c_calc_NCC(M.flatten().astype(np.float32), np.array(M.shape).astype(
-                np.int32), F.flatten().astype(np.float32), np.array(F.shape).astype(np.int32), self.NCC)
-            self.NCC = self.NCC.reshape(
-                [M.shape[1] - F.shape[1], M.shape[2] - F.shape[2]])
-        else:
-            self.NCC = self.calc_NCC(
-                self.template_feature_map.numpy(), self.image_feature_map.numpy())
+    def extract(self, template, image, layer, use_cython=False):
+        self.NCC = self.calc_NCC(
+            self.template_feature_map.numpy(), self.image_feature_map.numpy())
 
         threshold = float(self.threshold) * np.max(self.NCC)
         match_indices = np.array(np.where(self.NCC > threshold)).T
@@ -127,21 +115,17 @@ class FeatureExtractor():
         for max_index in match_indices:
             i_star, j_star = max_index
             NCC_part = self.NCC[i_star-1:i_star+2, j_star-2:j_star+2]
-
-            print(i_star, j_star)
-            print(self.template_feature_map.shape)
-            print(self.image_feature_map.shape)
-            print(image.shape)
-
-            x_center = (j_star + self.template_feature_map.shape[-1]/2) * image.shape[-1] // self.image_feature_map.shape[-1]
-            y_center = (i_star + self.template_feature_map.shape[-2]/2) * image.shape[-2] // self.image_feature_map.shape[-2]
+            x_center = (j_star + self.template_feature_map.shape[-1]/2) *\
+                       image.shape[-1] // self.image_feature_map.shape[-1]
+            y_center = (i_star + self.template_feature_map.shape[-2]/2) *\
+                       image.shape[-2] // self.image_feature_map.shape[-2]
 
             x1_0 = x_center - template.size()[-1]/2
             x2_0 = x_center + template.size()[-1]/2
             y1_0 = y_center - template.size()[-2]/2
             y2_0 = y_center + template.size()[-2]/2
 
-            stride_product = self.product(self.stride[:self.l_star])
+            stride_product = self.product(self.stride[:layer])
 
             x1 = np.sum(
                 NCC_part * (x1_0 + np.array([-2, -1, 0, 1]) * stride_product)[None, :]) / np.sum(NCC_part)
