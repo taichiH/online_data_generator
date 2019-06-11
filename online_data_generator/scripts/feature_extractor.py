@@ -107,7 +107,8 @@ class FeatureExtractor():
 
         threshold = float(self.threshold) * np.max(self.NCC)
         match_indices = np.array(np.where(self.NCC > threshold)).T
-        print("detected boxes: {}".format(len(match_indices)))
+
+        # print("detected boxes: {}".format(len(match_indices)))
 
         boxes = []
         centers = []
@@ -115,10 +116,9 @@ class FeatureExtractor():
         for max_index in match_indices:
             i_star, j_star = max_index
             NCC_part = self.NCC[i_star-1:i_star+2, j_star-2:j_star+2]
-            x_center = (j_star + self.template_feature_map.shape[-1]/2) *\
-                       image.shape[-1] // self.image_feature_map.shape[-1]
-            y_center = (i_star + self.template_feature_map.shape[-2]/2) *\
-                       image.shape[-2] // self.image_feature_map.shape[-2]
+
+            x_center = (j_star + self.template_feature_map.size()[-1]/2) * image.shape[-1] // self.image_feature_map.size()[-1]
+            y_center = (i_star + self.template_feature_map.size()[-2]/2) * image.shape[-2] // self.image_feature_map.size()[-2]
 
             x1_0 = x_center - template.size()[-1]/2
             x2_0 = x_center + template.size()[-1]/2
