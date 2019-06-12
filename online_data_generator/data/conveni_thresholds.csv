@@ -1,6 +1,6 @@
-,path,thresh
-0,conveni_templates/milk.png,0.7
-1,conveni_templates/mixjuice.png,0.7
-2,conveni_templates/coffee.png,0.7
-3,conveni_templates/dars.png,0.7
-4,conveni_templates/potechi.png,0.7
+,path,thresh,label
+0,conveni_templates/milk.png,0.95,milk
+1,conveni_templates/mixjuice.png,0.95,mixjuice
+2,conveni_templates/coffee.png,0.95,coffee
+3,conveni_templates/dars.png,0.95,dars
+4,conveni_templates/potechi.png,0.95,potechi

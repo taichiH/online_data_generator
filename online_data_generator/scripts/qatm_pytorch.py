@@ -1,17 +1,26 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.3'
-#       jupytext_version: 1.0.5
-#   kernelspec:
-#     display_name: Python 3
-#     language: python
-#     name: python3
-# ---
+'''
+MIT License
+
+Copyright (c) 2019 Hiromichi Kamata
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+'''
 
 import numpy as np
 import cv2
@@ -31,7 +40,8 @@ from utils import *
 # # CONVERT IMAGE TO TENSOR
 
 class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, template_dir_path, raw_image, thresh_csv=None, transform=None, image_name='input'):
+    def __init__(self, pkg_path, raw_image, thresh_csv=None, transform=None, image_name='input'):
+        self.pkg_path = pkg_path
         self.transform = transform
 
         if not self.transform:
@@ -43,37 +53,39 @@ class ImageDataset(torch.utils.data.Dataset):
                 )
             ])
 
-        self.template_path = list(template_dir_path.iterdir())
         self.image_name = image_name
         self.image_raw = raw_image
 
-        self.thresh_df = None
+        self.templates = None
         if thresh_csv:
-            self.thresh_df = pd.read_csv(thresh_csv)
+            self.templates = pd.read_csv(thresh_csv)
 
         if self.transform:
             self.image = self.transform(self.image_raw).unsqueeze(0)
 
     def __len__(self):
-        return len(self.template_names)
+        return len(self.templates)
 
     def __getitem__(self, idx):
-        template_path = str(self.template_path[idx])
+        if self.templates is None:
+            return None
+
+        label = self.templates.label[idx]
+        thresh = self.templates.thresh[idx]
+        template_path = os.path.join(self.pkg_path, self.templates.path[idx])
         template = cv2.imread(template_path)
         if self.transform:
             template = self.transform(template)
-        thresh = 0.7
-        if self.thresh_df is not None:
-            if self.thresh_df.path.isin([template_path]).sum() > 0:
-                thresh = float(self.thresh_df[self.thresh_df.path==template_path].thresh)
-        return {'image': self.image, 
-                'image_raw': self.image_raw, 
+
+        return {'image': self.image,
+                'image_raw': self.image_raw,
                 'image_name': self.image_name,
-                'template': template.unsqueeze(0), 
-                'template_name': template_path, 
+                'template': template.unsqueeze(0),
+                'template_name': template_path,
                 'template_h': template.size()[-2],
                 'template_w': template.size()[-1],
-                'thresh': thresh}
+                'thresh': thresh,
+                'label': label}
 
 
 template_dir = 'template/'
@@ -220,11 +232,13 @@ def nms(score, w_ini, h_ini, thresh=0.7):
     return boxes
 
 
-def plot_result(image_raw, boxes, show=False, save_name=None, color=(255, 0, 0)):
+def plot_result(image_raw, boxes, label, color_dict, show=False, save_name=None):
     # plot result
     d_img = image_raw.copy()
     for box in boxes:
-        d_img = cv2.rectangle(d_img, tuple(box[0]), tuple(box[1]), color, 3)
+        cv2.putText(
+            d_img, label, tuple(box[0]), cv2.FONT_HERSHEY_SIMPLEX, 1, color_dict[label], 2, cv2.LINE_AA)
+        d_img = cv2.rectangle(d_img, tuple(box[0]), tuple(box[1]), color_dict[label], 3)
     if show:
         plt.imshow(d_img)
     if save_name:
@@ -234,7 +248,7 @@ def plot_result(image_raw, boxes, show=False, save_name=None, color=(255, 0, 0))
 
 # ## MULTI
 
-def nms_multi(scores, w_array, h_array, thresh_list):
+def nms_multi(scores, w_array, h_array, thresh_list, label_list):
     indices = np.arange(scores.shape[0])
     maxes = np.max(scores.reshape(scores.shape[0], -1), axis=1)
     # omit not-matching templates
@@ -287,13 +301,15 @@ def nms_multi(scores, w_array, h_array, thresh_list):
     return boxes, np.array(keep_index)
 
 
-def plot_result_multi(image_raw, boxes, indices, show=False, save_name=None, color_list=None):
+def plot_result_multi(image_raw, boxes, labels, indices, show=False, save_name=None, color_list=None):
     d_img = image_raw.copy()
-    if color_list is None:
-        color_list = color_palette("hls", indices.max()+1)
-        color_list = list(map(lambda x: (int(x[0]*255), int(x[1]*255), int(x[2]*255)), color_list))
+
+    color_dict = {}
+    for label in labels:
+        color_dict[label] = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
+
     for i in range(len(indices)):
-        d_img = plot_result(d_img, boxes[i][None, :,:].copy(), color=color_list[indices[i]])
+        d_img = plot_result(d_img, boxes[i][None, :,:].copy(), labels[indices[i]], color_dict)
     if show:
         plt.imshow(d_img)
     if save_name:
@@ -330,16 +346,19 @@ def run_multi_sample(model, dataset):
     w_array = []
     h_array = []
     thresh_list = []
-    for data in dataset:
-        score = run_one_sample(model, data['template'], data['image'], data['image_name'])
+    label_list = []
+    for i in range(len(dataset) -1 ):
+        score = run_one_sample(
+            model, dataset[i]['template'], dataset[i]['image'], dataset[i]['image_name'])
         if scores is None:
             scores = score
         else:
             scores = np.concatenate([scores, score], axis=0)
-        w_array.append(data['template_w'])
-        h_array.append(data['template_h'])
-        thresh_list.append(data['thresh'])
-    return np.array(scores), np.array(w_array), np.array(h_array), thresh_list
+        w_array.append(dataset[i]['template_w'])
+        h_array.append(dataset[i]['template_h'])
+        thresh_list.append(dataset[i]['thresh'])
+        label_list.append(dataset[i]['label'])
+    return np.array(scores), np.array(w_array), np.array(h_array), thresh_list, label_list
 
 
 model = CreateModel(model=models.vgg19(pretrained=True).features, alpha=25, use_cuda=True)
