@@ -102,13 +102,14 @@ class FeatureExtractor():
 
 
     def extract(self, template, image, layer, use_cython=False):
+        print('calc_NCC')
         self.NCC = self.calc_NCC(
             self.template_feature_map.numpy(), self.image_feature_map.numpy())
 
         threshold = float(self.threshold) * np.max(self.NCC)
         match_indices = np.array(np.where(self.NCC > threshold)).T
 
-        # print("detected boxes: {}".format(len(match_indices)))
+        print("detected boxes: {}".format(len(match_indices)))
 
         boxes = []
         centers = []

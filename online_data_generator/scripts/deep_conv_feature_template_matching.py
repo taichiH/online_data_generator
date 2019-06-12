@@ -37,10 +37,14 @@ class DeepConvFeatureTemplateMatching():
                 std=[0.229, 0.224, 0.225],
             )])
 
+        vgg_feature = models.vgg13(pretrained=True).features
+        self.fe = FeatureExtractor(
+            vgg_feature, use_cuda=self.use_cuda, padding=True, threshold=self.threshold)
+
         self.pub_viz = rospy.Publisher('~output', Image, queue_size=1)
+        self.pub_debug = rospy.Publisher('~debug', Image, queue_size=1)
         rospy.Service('~match', Segmentation, self.service_callback)
         rospy.Subscriber('~input', Image, self.callback, queue_size=1)
-
 
     def load_templates(self, fe):
         templates = []
@@ -71,13 +75,14 @@ class DeepConvFeatureTemplateMatching():
         return fe.template_feature_map, extraction_layer, template
 
     def load_image(self, imgmsg):
+        print('load_image')
         bridge = cv_bridge.CvBridge()
         try:
-            self.image = bridge.imgmsg_to_cv2(imgmsg, desired_encoding='bgr8')
+            raw_image = bridge.imgmsg_to_cv2(imgmsg, desired_encoding='bgr8')
         except:
             rospy.logerr('failed transform image')
             return
-        raw_image = copy.copy(self.image)
+        # raw_image = copy.copy(self.image)
         return raw_image
 
     def create_image_feature_map(self, raw_image, fe, extraction_layer):
@@ -94,16 +99,17 @@ class DeepConvFeatureTemplateMatching():
         return M, image
 
     def callback(self, imgmsg):
-        vgg_feature = models.vgg13(pretrained=True).features
-        fe = FeatureExtractor(
-            vgg_feature, use_cuda=self.use_cuda, padding=True, threshold=self.threshold)
-
+        fe = self.fe
         # if not self.template_loaded:
         #     self.templates = self.load_templates(fe)
 
         self.templates = self.load_templates(fe)
         raw_image = self.load_image(imgmsg)
         output_image = raw_image.copy()
+
+        msg_debug = cv_bridge.CvBridge().cv2_to_imgmsg(raw_image, encoding='bgr8')
+        msg_debug.header = imgmsg.header
+        self.pub_debug.publish(msg_debug)
 
         raw_image = raw_image[..., ::-1]
 
@@ -120,7 +126,6 @@ class DeepConvFeatureTemplateMatching():
         msg_viz = cv_bridge.CvBridge().cv2_to_imgmsg(output_image, encoding='bgr8')
         msg_viz.header = imgmsg.header
         self.pub_viz.publish(msg_viz)
-
 
     def service_callback(self, req):
         bridge = cv_bridge.CvBridge()
