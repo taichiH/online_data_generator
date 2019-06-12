@@ -1,0 +1,30 @@
+<launch>
+  <arg name="use_cuda" default="true" />
+  <arg name="templates_dir" default="$(find online_data_generator)/conveni_templates" />
+  <arg name="thresholds" default="$(find online_data_generator)/data/conveni_thresholds.csv" />
+  <arg name="alpha" default="25" />
+
+  <!-- <arg name="input_image" default="/remote/openni_camera/rgb/image_rect_color" /> -->
+
+  <node name="image_publisher"
+        pkg="jsk_perception" type="image_publisher.py"
+        clear_params="true">
+    <rosparam subst_value="true">
+      file_name: $(find online_data_generator)/image.png
+      rate: 30
+    </rosparam>
+  </node>
+
+  <node name="qatm_template_matching"
+        pkg="online_data_generator" type="qatm_template_matching.py"
+        output="screen">
+    <rosparam subst_value="true">
+      use_cuda: $(arg use_cuda)
+      templates_dir: $(arg templates_dir)
+      thresholds: $(arg thresholds)
+      alpha: $(arg alpha)
+    </rosparam>
+    <remap from="~input" to="image_publisher/output" />
+  </node>
+
+</launch>
