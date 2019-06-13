@@ -1,0 +1,7 @@
+bool return_image
+std_msgs/Header header
+float32 publish_time
+---
+sensor_msgs/Image output_image
+bool status
+bool return_image
