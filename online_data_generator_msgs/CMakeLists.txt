@@ -18,6 +18,8 @@ add_service_files(
   FILES
   AnnotationTrigger.srv
   Segmentation.srv
+  GetImage.srv
+  ConvertImage.srv
   )
 
 generate_messages(

@@ -2,13 +2,14 @@
 #define _ONLINE_DATA_GENERATOR_DEEP_FLOW_H_
 
 #include <ros/ros.h>
+
 #include <nodelet/nodelet.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/optflow.hpp>
-#include <online_data_generator_msgs/Segmentation.h>
+#include <online_data_generator_msgs/GetImage.h>
 #include <boost/thread/mutex.hpp>
 
 namespace online_data_generator
@@ -20,14 +21,16 @@ namespace online_data_generator
   protected:
     virtual void onInit();
     virtual void callback(const sensor_msgs::ImageConstPtr &img_msg);
-    virtual bool service_callback(online_data_generator_msgs::Segmentation::Request &_req,
-                                  online_data_generator_msgs::Segmentation::Response &_res);
+    virtual bool service_callback(online_data_generator_msgs::GetImage::Request &_req,
+                                  online_data_generator_msgs::GetImage::Response &_res);
 
     ros::NodeHandle nh_;
     ros::NodeHandle pnh_;
     ros::Subscriber img_sub_;
     ros::ServiceServer service_server_;
     ros::Publisher output_img_pub_;
+    ros::Publisher output_mask_pub_;
+    ros::Publisher moved_mask_pub_;
 
     cv::Ptr<cv::DenseOpticalFlow> opt_ = cv::optflow::createOptFlow_DeepFlow();
 

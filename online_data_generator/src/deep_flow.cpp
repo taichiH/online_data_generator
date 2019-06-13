@@ -4,12 +4,13 @@ namespace online_data_generator
 {
   void DeepFlow::onInit()
   {
-    nh_ = getNodeHandle();
-    pnh_ = getPrivateNodeHandle();
+    nh_ = getMTNodeHandle();
+    pnh_ = getMTPrivateNodeHandle();
 
-    pnh_.getParam("debug", debug_);
     pnh_.getParam("threshold", threshold_);
     output_img_pub_ = pnh_.advertise<sensor_msgs::Image>("output", 1);
+    output_mask_pub_ = pnh_.advertise<sensor_msgs::Image>("output/mask", 1);
+    moved_mask_pub_ = pnh_.advertise<sensor_msgs::Image>("output/moved_mask", 1);
 
     service_server_ =
       pnh_.advertiseService("get_deep_flow_mask", &DeepFlow::service_callback,this);
@@ -17,22 +18,34 @@ namespace online_data_generator
       pnh_.subscribe("input", 1, &DeepFlow::callback, this);
   }
 
-  bool DeepFlow::service_callback(online_data_generator_msgs::Segmentation::Request &_req,
-                                  online_data_generator_msgs::Segmentation::Response &_res){
-    boost::mutex::scoped_lock lock(mutex_);
-
+  bool DeepFlow::service_callback(online_data_generator_msgs::GetImage::Request &_req,
+                                  online_data_generator_msgs::GetImage::Response &_res){
+    sensor_msgs::ImagePtr image_ptr;
     try{
-      sensor_msgs::ImagePtr image_ptr = cv_bridge::CvImage(header_,
-                                                           sensor_msgs::image_encodings::MONO8,
-                                                           mask_img_).toImageMsg();
-      _res.output_image = *image_ptr;
+      image_ptr = cv_bridge::CvImage(header_,
+                                     sensor_msgs::image_encodings::MONO8,
+                                     mask_img_).toImageMsg();
     } catch (cv_bridge::Exception& e){
       NODELET_ERROR("cv_bridge exception: %s", e.what());
-      _res.status = false;
       return false;
     }
 
+    if (_req.return_image) {
+      _res.output_image = *image_ptr;
+      _res.return_image = true;
+    }
+
+    float t = 0.0;
+    while (t < _req.publish_time) {
+      moved_mask_pub_.publish(cv_bridge::CvImage(header_,
+                                                 sensor_msgs::image_encodings::MONO8,
+                                                 mask_img_).toImageMsg());
+      usleep(100 * 300);
+      t += 0.03;
+    }
+
     _res.status = true;
+    _res.return_image = false;
     return true;
   }
 
@@ -87,12 +100,9 @@ namespace online_data_generator
       }
     }
 
-    if (debug_){
-      cv::imshow("hsv_image", hsv);
-      cv::imshow("debug_mask_img", mask_img_);
-      cv::waitKey(50);
-    }
-
+    output_mask_pub_.publish(cv_bridge::CvImage(img_msg->header,
+                                                sensor_msgs::image_encodings::MONO8,
+                                                mask_img_).toImageMsg());
     output_img_pub_.publish(cv_bridge::CvImage(img_msg->header,
                                                sensor_msgs::image_encodings::BGR8,
                                                output_img).toImageMsg());
