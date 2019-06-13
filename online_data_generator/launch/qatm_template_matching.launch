@@ -1,7 +1,6 @@
 <launch>
   <arg name="use_cuda" default="true" />
-  <arg name="templates_dir" default="$(find online_data_generator)/conveni_templates" />
-  <arg name="thresholds" default="$(find online_data_generator)/data/conveni_thresholds.csv" />
+  <arg name="templates" default="$(find online_data_generator)/data/conveni_thresholds.csv" />
   <arg name="alpha" default="25" />
 
   <arg name="input_image" default="/remote/openni_camera/rgb/image_rect_color" />
@@ -20,8 +19,7 @@
         output="screen">
     <rosparam subst_value="true">
       use_cuda: $(arg use_cuda)
-      templates_dir: $(arg templates_dir)
-      thresholds: $(arg thresholds)
+      templates: $(arg templates)
       alpha: $(arg alpha)
     </rosparam>
     <remap from="~input" to="$(arg input_image)" />

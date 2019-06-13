@@ -60,13 +60,12 @@ exec(code,  module.__dict__)
 
 from mod import *
 
-
 class QATM():
 
     def __init__(self):
         self.bridge = cv_bridge.CvBridge()
         self.use_cuda = rospy.get_param('~use_cuda', True)
-        self.thresholds = rospy.get_param('~thresholds', os.path.join(pkg_dir, 'data/thresholds.csv'))
+        self.templates = rospy.get_param('~templates', os.path.join(pkg_dir, 'data/thresholds.csv'))
         self.alpha = rospy.get_param('~alpha', 25)
 
         rospy.loginfo("define model...")
@@ -89,7 +88,7 @@ class QATM():
             return
 
         dataset = ImageDataset(
-            pkg_dir, raw_image, thresh_csv=self.thresholds, image_name='input')
+            pkg_dir, raw_image, thresh_csv=self.templates, image_name='input')
 
         rospy.loginfo("calculate score...")
         scores, w_array, h_array, thresh_list, label_list = run_multi_sample(self.model, dataset)
