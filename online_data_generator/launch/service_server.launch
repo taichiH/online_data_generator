@@ -1,0 +1,5 @@
+<launch>
+  <node name="flow_mask_extractor"
+        pkg="online_data_generator" type="flow_mask_extractor.py"
+        output="screen"/>
+</launch>

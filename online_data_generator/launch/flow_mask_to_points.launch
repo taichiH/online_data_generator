@@ -1,0 +1,35 @@
+<launch>
+  <arg name="input_image" default="/remote/openni_camera/rgb/image_rect_color" />
+  <arg name="input_cloud" default="/remote/point_cloud/cloud_registered/remote" />
+
+  <node name="apply_flow_mask_image"
+        pkg="nodelet" type="nodelet"
+        args="standalone jsk_perception/ApplyMaskImage">
+    <remap from="~input" to="$(arg input_image)" />
+    <remap from="~input/mask" to="/deep_flow/output/moved_mask" />
+    <rosparam>
+      approximate_sync: false
+      clip: false
+    </rosparam>
+  </node>
+
+  <node name="flow_mask_image_to_point_indices"
+        pkg="nodelet" type="nodelet"
+        args="standalone jsk_pcl_utils/MaskImageToPointIndices">
+    <remap from="~input" to="apply_flow_mask_image/output/mask"/>
+    <rosparam>
+      use_multi_channels: false
+    </rosparam>
+  </node>
+
+  <node name="extract_flow_indices"
+        pkg="nodelet" type="nodelet"
+        args="standalone jsk_pcl/ExtractIndices" >
+    <remap from="~input" to="$(arg input_cloud)" />
+    <remap from="~indices" to="/flow_mask_image_to_point_indices/output" />
+    <rosparam>
+      approximate_sync: true
+    </rosparam>
+  </node>
+
+</launch>
